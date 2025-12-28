@@ -53,8 +53,6 @@ public class OrderService {
         orderRepository.deleteById(id);
     }
 
-
-
     public Order placeOrder(
             String customerName,
             String customerEmail,
@@ -64,12 +62,35 @@ public class OrderService {
         // TODO #3: 구현 항목
         // * 주어진 고객 정보로 새 Order를 생성
         // * 지정된 Product를 주문에 추가
-        // * order 의 상태를 PENDING 으로 변경
-        // * orderDate 를 현재시간으로 설정
         // * order 를 저장
         // * 각 Product 의 재고를 수정
         // * placeOrder 메소드의 시그니처는 변경하지 않은 채 구현하세요.
-        return null;
+
+        Order createdOrder = Order.builder()
+                .customerName(customerName)
+                .customerEmail(customerEmail)
+                .status(Order.OrderStatus.PENDING)
+                .orderDate(LocalDateTime.now())
+                .build();
+
+        for (int i = 0; i < productIds.size(); i++) {
+            Long curProductId = productIds.get(i);
+            Integer curQuantity = quantities.get(i);
+
+            Product product = productRepository.findById(curProductId)
+                    .orElseThrow(() -> new RuntimeException("not found Product"));
+
+            OrderItem item = OrderItem.builder()
+                    .product(product)
+                    .quantity(curQuantity)
+                    .price(product.getPrice())
+                    .build();
+
+            createdOrder.addItem(item);
+            product.decreaseStock(curQuantity);
+        }
+
+        return orderRepository.save(createdOrder);
     }
 
     /**
