@@ -59,13 +59,6 @@ public class OrderService {
             List<Long> productIds,
             List<Integer> quantities
     ) {
-        // TODO #3: 구현 항목
-        // * 주어진 고객 정보로 새 Order를 생성
-        // * 지정된 Product를 주문에 추가
-        // * order 를 저장
-        // * 각 Product 의 재고를 수정
-        // * placeOrder 메소드의 시그니처는 변경하지 않은 채 구현하세요.
-
         Order createdOrder = Order.builder()
                 .customerName(customerName)
                 .customerEmail(customerEmail)
@@ -73,6 +66,7 @@ public class OrderService {
                 .orderDate(LocalDateTime.now())
                 .build();
 
+        BigDecimal subtotal = BigDecimal.ZERO;
         for (int i = 0; i < productIds.size(); i++) {
             Long curProductId = productIds.get(i);
             Integer curQuantity = quantities.get(i);
@@ -88,7 +82,11 @@ public class OrderService {
 
             createdOrder.addItem(item);
             product.decreaseStock(curQuantity);
+            subtotal = subtotal.add(product.getPrice().multiply(BigDecimal.valueOf(curQuantity)));
         }
+
+        BigDecimal shipping = subtotal.compareTo(new BigDecimal("100.00")) >= 0 ? BigDecimal.ZERO : new BigDecimal("5.00");
+        createdOrder.setTotalAmount(shipping);
 
         return orderRepository.save(createdOrder);
     }
@@ -158,6 +156,25 @@ public class OrderService {
      * - 시나리오: 일괄 배송 처리 중 진행률을 저장하여 다른 사용자가 조회 가능해야 함.
      * - 리뷰 포인트: proxy 및 transaction 분리, 예외 전파/롤백 범위, 가독성 등
      * - 상식적인 수준에서 요구사항(기획)을 가정하며 최대한 상세히 작성하세요.
+     */
+
+    /*
+    현재 로직
+    1. orderId 를 이용해서 주문 객체를 조회한다.
+    2. 조회된 Order 의 상태를 변경하고 새로운 트랜잭션 안에서 중간 진행률을 저장한다
+    3. 모든 작업이 완료되면 jobId로 조회한 다음 mark를 완성으로 저장한다.
+
+    문제점
+    트랜잭션이 모든 작업이 완료될 때까지 열려 있게 된다. DB 커넥션 풀에 문제가 생길 수 있다.
+    중간에 실패하게 되면 어떻게 처리되어야 하는지 존재하지 않는다. 특정 orderId에서 오래 걸리는 작업이 예외가 발생한다면 마킹이 필요하다
+
+    새로운 트랜잭션을 생성해서 계속해서 DB에 값을 저장하고 있어 중간에 조회가 들어와도 가장 최근의 진행률을 조회할 수 있을 것으로 예상된다.
+
+    Batch 작업으로 보인다. 오래 걸리는 작업을 트랜잭션 안에서 실행하지 않고 비동기로 처리한 후 결과를 저장하는 것이
+    자원을 효율적으로 사용할 수 있을 것이라고 생각한다.
+
+    ps.markCompleted도 모든 작업이 완료될 때까지 대기하지 않고 CDC 처리기를 사용할 수 있을 것 같다. 또는 이벤트 기반으로 오래 걸리는 작업
+    내부에서 작업 완료를 발행해 진행률을 업데이트 할 수 있다.
      */
     @Transactional
     public void bulkShipOrdersParent(String jobId, List<Long> orderIds) {
