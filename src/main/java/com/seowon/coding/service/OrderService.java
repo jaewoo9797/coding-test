@@ -55,7 +55,12 @@ public class OrderService {
 
 
 
-    public Order placeOrder(String customerName, String customerEmail, List<Long> productIds, List<Integer> quantities) {
+    public Order placeOrder(
+            String customerName,
+            String customerEmail,
+            List<Long> productIds,
+            List<Integer> quantities
+    ) {
         // TODO #3: 구현 항목
         // * 주어진 고객 정보로 새 Order를 생성
         // * 지정된 Product를 주문에 추가
