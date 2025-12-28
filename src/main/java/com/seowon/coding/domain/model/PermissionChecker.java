@@ -1,9 +1,12 @@
 package com.seowon.coding.domain.model;
 
 
+import com.seowon.coding.util.ListFun;
 import lombok.Builder;
+import lombok.Getter;
 
 import java.util.List;
+import java.util.Map;
 
 class PermissionChecker {
 
@@ -19,33 +22,39 @@ class PermissionChecker {
             List<UserGroup> groups,
             List<Policy> policies
     ) {
-        for (User user : users) {
-            if (user.id.equals(userId)) {
-                for (String groupId : user.groupIds) {
-                    for (UserGroup group : groups) {
-                        if (group.id.equals(groupId)) {
-                            for (String policyId : group.policyIds) {
-                                for (Policy policy : policies) {
-                                    if (policy.id.equals(policyId)) {
-                                        for (Statement statement : policy.statements) {
-                                            if (statement.actions.contains(targetAction) &&
-                                                statement.resources.contains(targetResource)) {
-                                                return true;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+        Map<String, User> userMap = ListFun.toHashMap(users, User::getId);
+        User foundUser = userMap.get(userId);
+        if (foundUser == null) {
+            return false;
+        }
+
+        Map<String, UserGroup> groupMap = ListFun.toHashMap(groups, UserGroup::getId);
+        Map<String, Policy> policyMap = ListFun.toHashMap(policies, Policy::getId);
+
+        // user와 연결된 group의 id 들을 이용해서 policy 찾아 연결
+        for (String groupId : foundUser.groupIds) {
+            UserGroup group = groupMap.get(groupId);
+            if (group == null) continue; // 유저가 가진 groupId가 목록에 없으면 스킵
+
+            for (String policyId : group.policyIds) {
+                Policy policy = policyMap.get(policyId);
+                if (policy == null) continue;
+
+                for (Statement statement : policy.statements) {
+                    if (statement.actions.contains(targetAction)
+                            && statement.resources.contains(targetResource)) {
+                        return true;
                     }
                 }
             }
         }
+
         return false;
     }
 }
 
 class User {
+    @Getter
     String id;
     List<String> groupIds;
 
@@ -56,6 +65,7 @@ class User {
 }
 
 class UserGroup {
+    @Getter
     String id;
     List<String> policyIds;
 
@@ -66,6 +76,7 @@ class UserGroup {
 }
 
 class Policy {
+    @Getter
     String id;
     List<Statement> statements;
 
